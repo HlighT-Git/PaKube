@@ -23,9 +23,9 @@ public class TileCube : MonoBehaviour
     }
     public void SetColorByStatus()
     {
-        if (tileBlockParent.Status == 1)
+        if (tileBlockParent.Status == TileStatus.NORMAL)
             SetColor(originalColor);
         else
-            SetColor(tileBlockParent.Tilemap.TileColors[tileBlockParent.Status]);
+            SetColor(tileBlockParent.Status);
     }
 }

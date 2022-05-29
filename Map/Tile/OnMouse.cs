@@ -4,8 +4,9 @@ using UnityEngine;
 
 public class OnMouse : MonoBehaviour
 {
-    private int previousStatus;
+    private Color previousStatus;
     private TileBlock tileBlockParent;
+    public static bool hoverABlock = false;
 
     private void Awake()
     {
@@ -14,36 +15,50 @@ public class OnMouse : MonoBehaviour
 
     private void OnMouseDown()
     {
-        if (tileBlockParent.Status == 0
-            || tileBlockParent.Status == 3
-            || tileBlockParent.Status == 4)
-            return;
         TileMap tilemap = tileBlockParent.Tilemap;
-        CharacterActions ca = tilemap.Player.GetComponent<CharacterActions>();
-
-        tileBlockParent.Tilemap.ResetMap();
-
-        TileBlock startBlock = tilemap.Player.GetComponent<CharacterStatus>().CurrentTileBlockStanding();
-        TileBlock endBlock = tileBlockParent;
-        startBlock.SetStatus(3);
-        endBlock.SetStatus(4);
-        ca.Moving(startBlock, endBlock);
-    }
-    private void OnMouseOver()
-    {
-        if (tileBlockParent.Status == 0
-            || tileBlockParent.Status == 3
-            || tileBlockParent.Status == 4)
+        if (PathFinder.isFinding
+            || TileStatus.Match(tileBlockParent.Status,
+            TileStatus.UNMOVABLE,
+            TileStatus.START, 
+            TileStatus.END)
+            ){
             return;
-        if (tileBlockParent.Status != 2)
+        }
+        tilemap.RefreshMapExcept();
+        if (!TileMap.upToDate)
+        {
+            tilemap.UpdateMap();
+        }
+        TileBlock startBlock = tilemap.Player.GetComponent<CharacterStats>().CurrentTileBlockStanding();
+        TileBlock endBlock = tileBlockParent;
+        tileBlockParent.Tilemap.PathFinder.FindPath(startBlock, endBlock);
+    }
+    private void OnMouseEnter()
+    {
+        hoverABlock = true;
+        if (TileStatus.Match(tileBlockParent.Status, TileStatus.UNMOVABLE, TileStatus.START, TileStatus.END))
+        {
+            return;
+        }
+        if (tileBlockParent.Status != TileStatus.HOVER)
             previousStatus = tileBlockParent.Status;
-        tileBlockParent.SetStatus(2);
+        tileBlockParent.SetStatus(TileStatus.HOVER);
     }
     private void OnMouseExit()
     {
-        if (tileBlockParent.Status == 2)
+        hoverABlock = false;
+        if (tileBlockParent.Status == TileStatus.HOVER)
         {
             tileBlockParent.SetStatus(previousStatus);
+        }
+        GameObject player = tileBlockParent.Tilemap.Player;
+        if (Input.GetMouseButton(1) && !PathFinder.isFinding)
+        {
+            if (player.transform.position.x != tileBlockParent.transform.position.x
+                || player.transform.position.y != tileBlockParent.transform.position.y)
+            {
+                tileBlockParent.Node.ChangeStatus();
+            }
         }
     }
 }

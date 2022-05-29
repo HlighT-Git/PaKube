@@ -6,7 +6,6 @@ public class CameraController : MonoBehaviour
 {
     private Transform cameraTransform;
     private Vector3 newPosition;
-    private int[,] limitTransform;
     [SerializeReference] private Quaternion newRotation;
     [SerializeReference] private Vector3 newZoom;
 
@@ -21,8 +20,6 @@ public class CameraController : MonoBehaviour
         newPosition = transform.position;
         newRotation = transform.rotation;
         newZoom = cameraTransform.localPosition;
-
-        limitTransform = new int[3, 2];
     }
 
     // Update is called once per frame
@@ -32,7 +29,7 @@ public class CameraController : MonoBehaviour
     }
     void HandleMouseInput()
     {
-        if (Input.mouseScrollDelta.y != 0)
+        if (OnMouse.hoverABlock && Input.mouseScrollDelta.y != 0)
         {
             newZoom += Input.mouseScrollDelta.y * transform.forward;
         }
@@ -71,7 +68,7 @@ public class CameraController : MonoBehaviour
             else
                 newRotation *= Quaternion.Euler(Vector3.left * (diff.y / 5f));
         }
-        transform.position = Vector3.Lerp(transform.position, newPosition, Time.deltaTime * 2);
+        //transform.position = Vector3.Lerp(transform.position, newPosition, Time.deltaTime * 2);
         transform.rotation = Quaternion.Lerp(transform.rotation, newRotation, Time.deltaTime * 2);
         cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, newZoom, Time.deltaTime * 2);
     }

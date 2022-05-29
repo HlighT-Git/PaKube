@@ -6,75 +6,75 @@ public class Floyd
 {
     private static bool IsNextToEachOther(TileMap.Node node1, TileMap.Node node2)
     {
-        int subX = node1.X - node2.X;
-        int subY = node1.Y - node2.Y;
+        int subX = (int)(node1.Position.x - node2.Position.x);
+        int subY = (int)(node1.Position.y - node2.Position.y);
         if (Mathf.Abs(subX) + Mathf.Abs(subY) == 1)
             return true;
         return false;
     }
-        private static void InitDistance(TileMap map)
+    private static void InitDistance()
     {
-        for (int i = 0; i < map.MapSizeX; i++)
+        for (int i = 0; i < TileMap.mapSizeX; i++)
         {
-            for (int j = 0; j < map.MapSizeY; j++)
+            for (int j = 0; j < TileMap.mapSizeY; j++)
             {
-                if (map.Graph[i, j].Cost == 0)
+                if (TileMap.Graph[i, j].Cost == 0)
                 {
                     continue;
                 }
-                for (int k = 0; k < map.MapSizeX; k++)
+                for (int k = 0; k < TileMap.mapSizeX; k++)
                 {
-                    for (int l = 0; l < map.MapSizeY; l++)
+                    for (int l = 0; l < TileMap.mapSizeY; l++)
                     {
-                        if (map.Graph[k, l].Cost == 0)
+                        if (TileMap.Graph[k, l].Cost == 0)
                         {
-                            map.Graph[i, j].CostTo[k, l] = 100;
+                            TileMap.Graph[i, j].CostTo[k, l] = 100;
                         }
                         else if (i == k && j == l)
-                            map.Graph[i, j].CostTo[k, l] = 0;
-                        else if (IsNextToEachOther(map.Graph[i, j], map.Graph[k, l]))
+                            TileMap.Graph[i, j].CostTo[k, l] = 0;
+                        else if (IsNextToEachOther(TileMap.Graph[i, j], TileMap.Graph[k, l]))
                         {
-                            map.Graph[i, j].CostTo[k, l] = map.Graph[k, l].Cost;
+                            TileMap.Graph[i, j].CostTo[k, l] = TileMap.Graph[k, l].Cost;
                         }
                         else
-                            map.Graph[i, j].CostTo[k, l] = 999;
+                            TileMap.Graph[i, j].CostTo[k, l] = 999;
                     }
                 }
             }
         }
     }
-    public static void CalculateHeuristicForAStar(TileMap map)
+    public static void CalculateAllPairCost()
     {
-        InitDistance(map);
-        for (int m = 0; m < map.MapSizeX; m++)
+        InitDistance();
+        for (int m = 0; m < TileMap.mapSizeX; m++)
         {
-            for (int n = 0; n < map.MapSizeY; n++)
+            for (int n = 0; n < TileMap.mapSizeY; n++)
             {
-                if (map.Graph[m, n].Cost == 0)
+                if (TileMap.Graph[m, n].Cost == 0)
                 {
                     continue;
                 }
-                for (int i = 0; i < map.MapSizeX; i++)
+                for (int i = 0; i < TileMap.mapSizeX; i++)
                 {
-                    for (int j = 0; j < map.MapSizeY; j++)
+                    for (int j = 0; j < TileMap.mapSizeY; j++)
                     {
-                        if (map.Graph[i, j].Cost == 0
+                        if (TileMap.Graph[i, j].Cost == 0
                             || (i == m && j == n))
                         {
                             continue;
                         }
-                        for (int k = 0; k < map.MapSizeX; k++)
+                        for (int k = 0; k < TileMap.mapSizeX; k++)
                         {
-                            for (int l = 0; l < map.MapSizeY; l++)
+                            for (int l = 0; l < TileMap.mapSizeY; l++)
                             {
-                                if (map.Graph[k, l].Cost == 0
+                                if (TileMap.Graph[k, l].Cost == 0
                                     || (k == m && l == n)
                                     || (k == i && l == j))
                                 {
                                     continue;
                                 }
-                                map.Graph[i, j].CostTo[k, l] = Mathf.Min(map.Graph[i, j].CostTo[k, l],
-                                    map.Graph[i, j].CostTo[m, n] + map.Graph[m, n].CostTo[k, l]);
+                                TileMap.Graph[i, j].CostTo[k, l] = Mathf.Min(TileMap.Graph[i, j].CostTo[k, l],
+                                    TileMap.Graph[i, j].CostTo[m, n] + TileMap.Graph[m, n].CostTo[k, l]);
                             }
                         }
                     }

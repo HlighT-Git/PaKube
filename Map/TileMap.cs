@@ -4,225 +4,228 @@ using UnityEngine;
 
 public class TileMap : MonoBehaviour
 {
+    public static bool upToDate = false;
+    public static int mapSizeX;
+    public static int mapSizeY;
+    public static int mapRootX;
+    public static int mapRootY;
+    public static bool isWeightGraphMap;
+    private static Node[,] graph;
+    public static Node[,] Graph { get => graph; set => graph = value; }
+    public static Vector2 GetGraphIndexByCoordinates(float x, float y)
+    {
+        return new Vector2(x - mapRootX, y - mapRootY);
+    }
     public class Node
     {
         private TileBlock tileBlock;
         private List<Node> neighbours;
-        private AStarPathFinding.Node searchNode;
-        private int x;
-        private int y;
+        private Vector3 position;
         private int cost;
         private int[,] costTo;
+        private KeyValuePair<int, int> searchCost;
 
-        public Node(int cost, int mapSizeX, int mapSizeY)
+        public Node(int cost)
         {
-            Neighbours = new List<Node>();
-            this.Cost = cost;
+            neighbours = new List<Node>();
+            this.cost = cost;
             costTo = new int[mapSizeX, mapSizeY];
         }
-
+        public Vector2 Index()
+        {
+            return new Vector2(position.x - mapRootX, position.y - mapRootY);
+        }
+        public void FindNeighbours()
+        {
+            Vector2 index = Index();
+            int x = Mathf.RoundToInt(index.x);
+            int y = Mathf.RoundToInt(index.y);
+            CheckAndAddNeighbour(x, y, x - 1, y);
+            CheckAndAddNeighbour(x, y, x, y - 1);
+            CheckAndAddNeighbour(x, y, x + 1, y);
+            CheckAndAddNeighbour(x, y, x, y + 1);
+        }
+        public void CheckAndAddNeighbour(int x, int y, int i, int j)
+        {
+            if (x < 0 || y < 0 ||
+                x > mapSizeX - 1 ||
+                y > mapSizeY - 1 || 
+                i < 0 || j < 0 ||
+                i > mapSizeX - 1 ||
+                j > mapSizeY - 1 ||
+                graph[i, j].Cost == 0 ||
+                graph[x, y].neighbours.Contains(graph[i, j]) ||
+                Mathf.Abs(x - i) + Mathf.Abs(y - j) != 1)
+            {
+                return;
+            }
+            graph[x, y].neighbours.Add(graph[i, j]);
+        }
+        public void ChangeStatus()
+        {
+            upToDate = false;
+            if (cost > 0)
+            {
+                cost = 0;
+                foreach(Node ele in neighbours)
+                {
+                    ele.Neighbours.Remove(this);
+                }
+                neighbours.Clear();
+            }
+            else
+            {
+                cost = 1;
+                if (isWeightGraphMap)
+                {
+                    cost = Random.Range(1, 7);
+                }
+                FindNeighbours();
+                Vector2 index = Index();
+                int x = Mathf.RoundToInt(index.x);
+                int y = Mathf.RoundToInt(index.y);
+                CheckAndAddNeighbour(x - 1, y, x, y);
+                CheckAndAddNeighbour(x, y - 1, x, y);
+                CheckAndAddNeighbour(x + 1, y, x, y);
+                CheckAndAddNeighbour(x, y + 1, x, y);
+            }
+            tileBlock.InitTileBlock(this);
+        }
         public TileBlock TileBlock { get => tileBlock; set => tileBlock = value; }
         public List<Node> Neighbours { get => neighbours; set => neighbours = value; }
-        public AStarPathFinding.Node SearchNode { get => searchNode; set => searchNode = value; }
-        public int X { get => x; set => x = value; }
-        public int Y { get => y; set => y = value; }
+        public Vector3 Position { get => position; set => position = value; }
         public int Cost { get => cost; set => cost = value; }
         public int[,] CostTo { get => costTo; set => costTo = value; }
+        public KeyValuePair<int, int> SearchCost { get => searchCost; set => searchCost = value; }
     }
-    private class Character
-    {
-        private GameObject gameObj;
-        private int x;
-        private int y;
-
-        public Character(int x, int y)
-        {
-            this.x = x;
-            this.y = y;
-        }
-        public GameObject GameObj { get => gameObj; set => gameObj = value; }
-        public int X { get => x; set => x = value; }
-        public int Y { get => y; set => y = value; }
-    }
-    // Start is called before the first frame update
-    private int mapSizeX = 10;
-    private int mapSizeY = 10;
-    private int mapRootX = -5;
-    private int mapRootY = -5;
-    private Node[,] graph;
-    private Color[] tileColors;
     [SerializeReference] private GameObject tileVisualPrefab;
     [SerializeReference] private GameObject player;
-    [SerializeReference] private GameObject enemyVisualPrefab;
-    private Character[] chars;
-    private int numberOfEnemies = 1;
-
-    public int MapSizeX { get => mapSizeX; set => mapSizeX = value; }
-    public int MapSizeY { get => mapSizeY; set => mapSizeY = value; }
-    public int MapRootX { get => mapRootX; set => mapRootX = value; }
-    public int MapRootY { get => mapRootY; set => mapRootY = value; }
-    public Node[,] Graph { get => graph; set => graph = value; }
-    public Color[] TileColors { get => tileColors; set => tileColors = value; }
+    //[SerializeReference] private GameObject graphSetup;
+    [SerializeReference] private PathFinder pathFinder;
+    [SerializeReference] private VisualController visualController;
     public GameObject Player { get => player; set => player = value; }
-    private void Awake()
+    public VisualController VisualController { get => visualController; set => visualController = value; }
+    public PathFinder PathFinder { get => pathFinder; set => pathFinder = value; }
+
+    public void GenerateMap(int sizeX, int sizeY, bool isWeightGraph)
     {
-        player = GameObject.FindGameObjectWithTag("Player");
-        SetUpTileColors();
-    }
-    public void GenerateMap()
-    {
+        mapSizeX = sizeX;
+        mapSizeY = sizeY;
+        isWeightGraphMap = isWeightGraph;
         GenerateMapData();
         GenerateMapVisual();
         GenerateGraph();
-        Floyd.CalculateHeuristicForAStar(this);
         InitWorldStatus();
+        UpdateMap();
+    }
+    public void UpdateMap()
+    {
+        Floyd.CalculateAllPairCost();
+        upToDate = true;
     }
     void Start()
     {
-        GenerateMap();
-    }
-    private void SetUpTileColors()
-    {
-        TileColors = new Color[8];
-        /*
-         * 0: Non-use.
-         * 1: Normal.
-         * 2: Hover.
-         * 3: Start.
-         * 4: End.
-         * 5: In queue.
-         * 6: In path.
-         * 7: Visited.
-         */
-        TileColors[0] = Color.black;
-        TileColors[1] = Color.white;
-        TileColors[2] = Color.blue;
-        TileColors[3] = Color.green;
-        TileColors[4] = Color.red;
-        TileColors[5] = new Color(1, 1, 128 / 255f);
-        TileColors[6] = new Color(1, 140 / 255f, 0);
-        TileColors[7] = new Color(0, 128 / 255f, 0);
+        GenerateMap(10, 10, true);
     }
     private void GenerateMapData()
     {
-        graph = new Node[MapSizeX, MapSizeY];
-        for (int x = 0; x < MapSizeX; x++)
+        mapRootX = - mapSizeX / 2;
+        mapRootY = - mapSizeY / 2;
+        graph = new Node[mapSizeX, mapSizeY];
+        for (int x = 0; x < mapSizeX; x++)
         {
-            for (int y = 0; y < MapSizeY; y++)
+            for (int y = 0; y < mapSizeY; y++)
             {
-                graph[x, y] = new Node(Random.Range(0, 6), MapSizeX, MapSizeY);
+                int cost = Random.Range(1, 7);
+                if (!isWeightGraphMap)
+                {
+                    cost = 1;
+                }
+                graph[x, y] = new Node(cost);
             }
         }
-
-        chars = new Character[numberOfEnemies + 1];
-        bool[,] occupied = new bool[MapSizeX, MapSizeY];
-
+    }
+    private void InitWorldStatus()
+    {
         int playerX, playerY;
-        playerX = Random.Range(0, MapSizeX);
-        playerY = Random.Range(0, MapSizeY);
-        graph[playerX, playerY].Cost = Random.Range(1, 6);
-        occupied[playerX, playerY] = true;
-        chars[0] = new Character(playerX, playerY);
-        chars[0].GameObj = player;
-
-        for (int i = 0; i < numberOfEnemies; i++)
+        playerX = Random.Range(0, mapSizeX);
+        playerY = Random.Range(0, mapSizeY);
+        while (graph[playerX, playerY].Cost == 0)
         {
-            int enemyX, enemyY;
-            enemyX = Random.Range(0, MapSizeX);
-            enemyY = Random.Range(0, MapSizeY);
-            while (occupied[enemyX, enemyY])
-            {
-                enemyX = Random.Range(0, MapSizeX);
-                enemyY = Random.Range(0, MapSizeY);
-            }
-            graph[enemyX, enemyY].Cost = Random.Range(1, 6);
-            occupied[enemyX, enemyY] = true;
-            chars[i+1] = new Character(enemyX, enemyY);
+            playerX = Random.Range(0, mapSizeX);
+            playerY = Random.Range(0, mapSizeY);
         }
+        player.transform.position = new Vector3(graph[playerX, playerY].Position.x, graph[playerX, playerY].Position.y, -1);
     }
     private void GenerateGraph()
     {
-        for (int x = 0; x < MapSizeX; x++)
+        for (int x = 0; x < mapSizeX; x++)
         {
-            for (int y = 0; y < MapSizeY; y++)
+            for (int y = 0; y < mapSizeY; y++)
             {
                 if (graph[x, y].Cost == 0)
                     continue;
-                if (x > 0 && graph[x - 1, y].Cost != 0)
-                    graph[x, y].Neighbours.Add(graph[x - 1, y]);
-                if (y > 0 && graph[x, y - 1].Cost != 0)
-                    graph[x, y].Neighbours.Add(graph[x, y - 1]);
-                if (x < MapSizeX - 1 && graph[x + 1, y].Cost != 0)
-                    graph[x, y].Neighbours.Add(graph[x + 1, y]);
-                if (y < MapSizeY - 1 && graph[x, y + 1].Cost != 0)
-                    graph[x, y].Neighbours.Add(graph[x, y + 1]);
+                graph[x, y].FindNeighbours();
             }
         }
     }
-        public void ResetMap()
+    public void RefreshMapExcept(params Color[] colors)
     {
-        for (int x = 0; x < MapSizeX; x++)
+        for (int x = 0; x < mapSizeX; x++)
         {
-            for (int y = 0; y < MapSizeY; y++)
+            for (int y = 0; y < mapSizeY; y++)
             {
-                if (graph[x, y].Cost == 0)
-                    continue;
-                graph[x, y].SearchNode = null;
-                graph[x, y].TileBlock.SetStatus(1);
+                bool needReset = graph[x, y].Cost != 0;
+                foreach (Color color in colors)
+                {
+                    if (graph[x, y].TileBlock.Status == color)
+                    {
+                        needReset = false;
+                        break;
+                    }
+                }
+                if (needReset)
+                {
+                    graph[x, y].TileBlock.SetStatus(TileStatus.NORMAL);
+                }
+            }
+        }
+    }
+    public void RefreshMap()
+    {
+        for (int x = 0; x < mapSizeX; x++)
+        {
+            for (int y = 0; y < mapSizeY; y++)
+            {
+                if (graph[x, y].Cost != 0)
+                {
+                    graph[x, y].TileBlock.SetStatus(TileStatus.NORMAL);
+                }
             }
         }
     }
     private void GenerateMapVisual()
     {
-        for (int x = 0; x < MapSizeX; x++)
+        for (int x = 0; x < mapSizeX; x++)
         {
-            for (int y = 0; y < MapSizeY; y++)
+            for (int y = 0; y < mapSizeY; y++)
             {
-                graph[x, y].X = x + MapRootX;
-                graph[x, y].Y = y + MapRootY;
-                GameObject go = Instantiate(tileVisualPrefab, new Vector3(graph[x, y].X, graph[x, y].Y), Quaternion.identity);
+                graph[x, y].Position = new Vector3(x + mapRootX, y + mapRootY, 0);
+                GameObject go = Instantiate(tileVisualPrefab
+                    , new Vector3(graph[x, y].Position.x, graph[x, y].Position.y), Quaternion.identity);
+                go.transform.parent = gameObject.transform;
                 TileBlock tb = go.GetComponent<TileBlock>();
                 tb.Tilemap = this;
-                tb.Node = graph[x, y];
-                graph[x, y].TileBlock = tb;
-                tb.InitTileBlockStatus();
+                tb.InitTileBlock(graph[x, y]);
             }
         }
-        for (int i = 0; i < numberOfEnemies; i++)
-        {
-            int x = chars[i + 1].X;
-            int y = chars[i + 1].Y;
-            chars[i+1].GameObj = Instantiate(enemyVisualPrefab, new Vector3(graph[x, y].X, graph[x, y].Y, -1), Quaternion.identity);
-        }
-    }
-    private void InitWorldStatus()
-    {
-        for (int i = 0; i <= numberOfEnemies; i++)
-        {
-            int x = chars[i].X;
-            int y = chars[i].Y;
-            chars[i].GameObj.transform.position = new Vector3 (graph[x, y].X, graph[x, y].Y, -1);
-            chars[i].GameObj.GetComponent<CharacterActions>().Map = this.gameObject;
-            graph[x, y].TileBlock.Holding = chars[i].GameObj;
-        }
-    }
-    public Vector2 GetGraphIndexByCoordinates(float x, float y)
-    {
-        return new Vector2(x - mapRootX, y - mapRootY);
     }
 
     public void DestroyMap()
     {
-        for (int x = 0; x < MapSizeX; x++)
+        foreach (Transform child in transform)
         {
-            for (int y = 0; y < MapSizeY; y++)
-            {
-                Destroy(graph[x, y].TileBlock.gameObject);
-            }
-        }
-        for (int i = 0; i < numberOfEnemies; i++)
-        {
-            Destroy(chars[i + 1].GameObj);
+            Destroy(child.gameObject);
         }
     }
 }
